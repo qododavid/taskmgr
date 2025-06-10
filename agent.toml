@@ -24,7 +24,7 @@ mcpServers = """
         "command": "uvx",
         "args": ["mcp-shell-server"],
         "env": {
-            "ALLOW_COMMANDS": "gh,ls,cat,pwd,rg,wc,touch,find,mkdir,rm,cp,mv,npm,npx,jest,mocha,ts-node,tsc,node,jq,echo,test,diff,sed,awk,git,cd,exit,yarn, grep"
+            "ALLOW_COMMANDS": "gh,ls,cat,pwd,rg,wc,touch,find,mkdir,rm,cp,mv,npm,npx,jest,mocha,ts-node,tsc,node,jq,echo,test,diff,sed,awk,git,cd,exit,yarn,grep,bash,go"
         }
     },
     "filesystem": {
