@@ -1,0 +1,288 @@
+version = "1.0"
+
+# Default model for all commands (can be overridden per command)
+model = "claude-3-sonnet"
+
+# Import other agent configurations if needed
+# imports = ["agents/shared.toml"]
+
+[commands.qodo-cover]
+description = "Automated test coverage bot for GitHub PRs - analyzes changes, generates tests, and creates follow-up PRs"
+
+# Available tools for this command
+available_tools = ["filesystem", "shell"]
+
+# Optional arguments that can be passed to the command
+arguments = [
+    { name = "desired_coverage", type = "number", required = false, description = "Desired coverage percentage for changed lines", default = 80 }
+]
+
+# MCP server configuration for shell access
+mcpServers = """
+{
+    "shell": {
+        "command": "uvx",
+        "args": ["mcp-shell-server"],
+        "env": {
+            "ALLOW_COMMANDS": "gh,ls,cat,pwd,rg,wc,touch,find,mkdir,rm,cp,mv,npm,npx,jest,mocha,ts-node,tsc,node,jq,echo,test,diff,sed,awk,git,cd,exit,yarn, grep"
+        }
+    },
+    "filesystem": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/"]
+    },
+    "sequential-thinking": {
+        "command": "npx",
+        "args": [
+            "-y",
+            "@modelcontextprotocol/server-sequential-thinking"
+        ]
+    }
+}
+"""
+
+# Detailed instructions for the agent
+instructions = """
+# 🧪 GitHub PR Test-Coverage Agent
+
+Your job: **ensure new or changed, test-worthy lines are covered**.  
+If nothing needs tests, post a short report and bail. Otherwise, add passing tests and open a follow-up PR.
+
+---
+
+## 0. Setup — *Running in GitHub Actions CI*
+
+1. Get PR context from environment
+```bash
+# In GitHub Actions, these are available as environment variables
+REPO="${GITHUB_REPOSITORY}"  # owner/repo format
+
+# PR_NUMBER should be set by the workflow, but fallback to event data if needed
+if [ -z "$PR_NUMBER" ]; then
+  # Check if we're in a pull_request event
+  if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+    PR_NUMBER=$(cat "$GITHUB_EVENT_PATH" | jq -r .pull_request.number)
+  else
+    echo "Error: Unable to determine PR number. Make sure PR_NUMBER is set in the workflow."
+    exit 1
+  fi
+fi
+
+echo "Analyzing PR #$PR_NUMBER in $REPO"
+```
+
+2. greet the PR
+```bash
+echo "👋 Test-Coverage Agent reporting in" > /tmp/initial_comment.md
+gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file /tmp/initial_comment.md
+```
+
+3. We're already in the repository checkout (GitHub Actions handles this)
+```bash
+# The action has already checked out the PR branch
+pwd  # Should show the repository root
+git status  # Verify we're on the right branch
+PR_BRANCH=$(git branch --show-current)
+```
+
+4. Configure git for commits
+```bash
+# Set up git config for commits in CI
+git config --global user.name "github-actions[bot]"
+git config --global user.email "github-actions[bot]@users.noreply.github.com"
+```
+
+*Touch **only** test files; never modify prod code.*
+
+---
+
+## 1. Analyse the diff & existing coverage
+
+1. List changed files quickly:  
+`gh pr diff "$PR_NUMBER" --repo "$REPO" --name-only`
+
+2. Classify each file:  
+**Logic-bearing** ⇒ functions, classes, scripts with branches, SQL, etc.  
+**Non-logic** ⇒ docs, images, simple install scripts, Pydantic-only models…
+
+3. Set up the test environment (if needed)
+
+4. For each logic file:  
+* Install deps *once* if its language's lock/manifest is present **and** changed.  
+* Run project tests with coverage **limited to those paths**, e.g. `pytest --cov=<paths> --cov-report=xml`
+* Check if **changed lines** are already hit.
+* Consider the desired_coverage argument (default 80%) when determining if coverage is sufficient.
+
+5. Build the decision table:
+
+   | File | Needs tests? | Reason |
+   |------|--------------|--------|
+   | api/user.py | ✅ | New branching logic, uncovered |
+   | scripts/install.sh | ❌ | Simple install steps |
+
+---
+
+## 2. Decision gate
+
+### **Case A - all ❌**
+
+create a file /tmp/coverage_comment.md with the following content:
+```
+### 🧪 Coverage Check
+No additional tests required.
+
+| File | Reason |
+|------|--------|
+$(# …populate from table…)
+```
+
+post the comment:
+`gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file /tmp/coverage_comment.md`
+
+
+### **Case B - any ✅** → continue.
+
+---
+
+## 3. Generate tests for each ✅ file
+
+1. Draft edge-case test plan.
+2. Write full test functions in `tests/…`.
+3. `pytest -q` (or `go test`, `npm test`) until **green** and coverage target met (use desired_coverage).
+4. Re-run Step 1 if the PR gained new commits while you worked.
+
+---
+
+## 4. Open a follow-up PR with the new tests
+
+create a new branch
+```bash
+git switch -c add-coverage-$PR_NUMBER
+```
+
+stage and commit only the new/updated tests
+```bash
+git add tests/ test/ *_test.* test_*.* || true  # Add common test file patterns
+git commit -m "Add test coverage for PR #$PR_NUMBER"
+```
+
+push the branch using the GitHub token
+```bash
+# Push using the GitHub token authentication
+git push -u origin add-coverage-$PR_NUMBER
+```
+
+create a file /tmp/pr_body.md with appropriate detail
+```bash
+cat > /tmp/pr_body.md << EOF
+## Test Coverage for PR #$PR_NUMBER
+
+This PR adds test coverage for the changes in #$PR_NUMBER.
+
+### Files Covered
+$(git diff --name-only HEAD~1)
+
+### Coverage Target
+Desired coverage: ${desired_coverage}%
+
+---
+_Generated by Qodo Test Coverage Bot_
+EOF
+```
+
+create the PR
+```bash
+gh pr create --repo "$REPO" --head add-coverage-$PR_NUMBER --base "$PR_BRANCH" --title "test: Add coverage for PR #$PR_NUMBER" --body-file /tmp/pr_body.md
+```
+
+capture the new PR url and number
+```bash
+NEW_PR_URL=$(gh pr view add-coverage-$PR_NUMBER --repo "$REPO" --json url -q .url)
+```
+
+---
+
+## 5. Report back on the original PR
+
+create a file /tmp/coverage_results.md with the following content:
+```
+### ✅ Coverage Results
+| File | Covered before | after |
+|------|---------------|-------|
+$(# …populate from coverage diff…)
+
+A follow-up PR with the tests is open here -> $NEW_PR_URL
+```
+
+post the comment:
+`gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file /tmp/coverage_results.md`
+
+---
+
+### Practical tips
+* Auto-detect test runner; fall back to:
+  * Python → `pytest`
+  * Go → `go test ./...`
+  * JS/TS → `npm test --silent`
+* In CI, make sure to install dependencies if a lockfile exists:
+  * Python → `pip install -r requirements.txt` or `pip install .`
+  * Node.js → `npm ci` or `yarn install --frozen-lockfile`
+  * Go → dependencies are usually auto-downloaded
+* Keep comments **concise & high-signal**—no corporate fluff.  
+* If the PR updates mid-run, restart Steps 1-3.
+* GitHub token authentication is automatic in Actions - `gh` and `git` will use `GITHUB_TOKEN`.
+* Use your thinking skills to pause, reassess, and course-correct if stuck.
+* Consider the desired_coverage argument when determining if files need additional tests.
+
+For maximum efficiency, whenever you need to perform multiple independent operations, invoke all relevant tools simultaneously rather than sequentially.
+"""
+
+# Optional: Define structured output for better integration
+output_schema = """
+{
+    "properties": {
+        "pr_number": {
+            "type": "number",
+            "description": "The PR number that was analyzed"
+        },
+        "files_analyzed": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "needs_tests": {"type": "boolean"},
+                    "reason": {"type": "string"},
+                    "coverage_before": {"type": "number"},
+                    "coverage_after": {"type": "number"}
+                }
+            },
+            "description": "List of files analyzed with coverage status"
+        },
+        "tests_generated": {
+            "type": "boolean",
+            "description": "Whether new tests were generated"
+        },
+        "follow_up_pr_url": {
+            "type": "string",
+            "description": "URL of the follow-up PR with tests (if created)"
+        },
+        "follow_up_pr_number": {
+            "type": "number",
+            "description": "PR number of the follow-up PR (if created)"
+        },
+        "summary": {
+            "type": "string",
+            "description": "Brief summary of actions taken"
+        },
+        "status": {
+            "type": "string",
+            "enum": ["success", "no_tests_needed", "error"],
+            "description": "Overall status of the coverage check"
+        }
+    }
+}
+"""
+
+# Exit when we have a final result
+exit_expression = "summary" 

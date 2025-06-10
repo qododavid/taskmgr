@@ -1,15 +1,29 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"log"
 	"os"
 	"strings"
+	"time"
+
+	"github.com/getsentry/sentry-go"
 
 	"taskmgr/internal/cli"
 	"taskmgr/internal/tasks"
 )
 
 func main() {
+	err := sentry.Init(sentry.ClientOptions{
+		Dsn: "https://c41e794f3c4d70cd5616e8586b60545f@o4509316990959616.ingest.us.sentry.io/4509317167579136",
+	})
+	if err != nil {
+		log.Fatalf("sentry.Init: %s", err)
+	}
+	// Flush buffered events before the program terminates.
+	defer sentry.Flush(2 * time.Second)
+
 	cmd, args := cli.ParseArgs(os.Args[1:])
 	store := tasks.NewFileStore("tasks.json") // Updated to file-based store
 	manager := tasks.NewTaskManager(store)
@@ -24,6 +38,7 @@ func main() {
 		err := manager.Add(t)
 		if err != nil {
 			fmt.Println("Error adding task:", err)
+			sentry.CaptureException(err)
 			os.Exit(1)
 		}
 		fmt.Println("Task added.")
@@ -44,6 +59,7 @@ func main() {
 		err := manager.MarkDone(args[0])
 		if err != nil {
 			fmt.Println("Error marking done:", err)
+			sentry.CaptureException(err)
 			os.Exit(1)
 		}
 		fmt.Println("Task marked as done.")
@@ -127,8 +143,12 @@ func main() {
 			}
 			fmt.Printf("%d: [%s] %s\n", i, done, t.Title)
 		}
+	case "error":
+		// Trigger an error to test sentry.
+		err := errors.New("test error. create gh issue?")
+		sentry.CaptureException(err)
 	default:
-		fmt.Println("Usage: taskmgr [command] ...") 
+		fmt.Println("Usage: taskmgr [command] ...")
 		fmt.Println("Available commands:")
 		fmt.Println("  add <title>            - Add a new task")
 		fmt.Println("  list                   - List all tasks")
