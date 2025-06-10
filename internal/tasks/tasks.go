@@ -143,3 +143,96 @@ func (tm *TaskManager) UndoDone(indexStr string) error {
 	t.Done = false
 	return tm.store.Update(idx, t)
 }
+
+// ClearCompleted removes all completed tasks
+func (tm *TaskManager) ClearCompleted() error {
+	tasks := tm.store.List()
+	for i := len(tasks) - 1; i >= 0; i-- {
+		if tasks[i].Done {
+			if remover, ok := tm.store.(interface{ Remove(int) error }); ok {
+				if err := remover.Remove(i); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// CountUndone returns the number of incomplete tasks
+func (tm *TaskManager) CountUndone() int {
+	tasks := tm.store.List()
+	count := 0
+	for _, t := range tasks {
+		if !t.Done {
+			count++
+		}
+	}
+	return count
+}
+
+// ListUndone returns only incomplete tasks
+func (tm *TaskManager) ListUndone() []Task {
+	tasks := tm.store.List()
+	var undone []Task
+	for _, t := range tasks {
+		if !t.Done {
+			undone = append(undone, t)
+		}
+	}
+	return undone
+}
+
+// ToggleDone flips the done status of a task
+func (tm *TaskManager) ToggleDone(indexStr string) error {
+	idx, err := parseIndex(indexStr)
+	if err != nil {
+		return err
+	}
+
+	tasks := tm.store.List()
+	if idx < 0 || idx >= len(tasks) {
+		return fmt.Errorf("invalid index")
+	}
+
+	t := tasks[idx]
+	t.Done = !t.Done
+	return tm.store.Update(idx, t)
+}
+
+// IsEmpty checks if the task list is empty
+func (tm *TaskManager) IsEmpty() bool {
+	return len(tm.store.List()) == 0
+}
+
+// GetTask retrieves a specific task by index
+func (tm *TaskManager) GetTask(indexStr string) (*Task, error) {
+	idx, err := parseIndex(indexStr)
+	if err != nil {
+		return nil, err
+	}
+
+	tasks := tm.store.List()
+	if idx < 0 || idx >= len(tasks) {
+		return nil, fmt.Errorf("invalid index")
+	}
+
+	return &tasks[idx], nil
+}
+
+// UpdateTitle changes the title of a task
+func (tm *TaskManager) UpdateTitle(indexStr string, newTitle string) error {
+	idx, err := parseIndex(indexStr)
+	if err != nil {
+		return err
+	}
+
+	tasks := tm.store.List()
+	if idx < 0 || idx >= len(tasks) {
+		return fmt.Errorf("invalid index")
+	}
+
+	t := tasks[idx]
+	t.Title = newTitle
+	return tm.store.Update(idx, t)
+}
