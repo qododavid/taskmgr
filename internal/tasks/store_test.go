@@ -58,3 +58,89 @@ func TestFileStore(t *testing.T) {
 		t.Errorf("Expected persisted 'Updated' task, got %v", list)
 	}
 }
+
+func TestFileStoreRemove(t *testing.T) {
+	// Create a temporary directory for test files
+	dir, err := ioutil.TempDir("", "taskmgr_remove_test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(dir) // Clean up
+
+	testFile := filepath.Join(dir, "tasks.json")
+	store := NewFileStore(testFile)
+
+	// Add multiple tasks
+	store.Add(Task{Title: "Task1"})
+	store.Add(Task{Title: "Task2"})
+	store.Add(Task{Title: "Task3"})
+
+	list := store.List()
+	if len(list) != 3 {
+		t.Errorf("Expected 3 tasks, got %d", len(list))
+	}
+
+	// Remove middle task
+	err = store.Remove(1)
+	if err != nil {
+		t.Errorf("Remove returned an error: %v", err)
+	}
+
+	list = store.List()
+	if len(list) != 2 {
+		t.Errorf("Expected 2 tasks after removal, got %d", len(list))
+	}
+	if list[0].Title != "Task1" || list[1].Title != "Task3" {
+		t.Errorf("Expected tasks 'Task1' and 'Task3', got %v", list)
+	}
+
+	// Test invalid remove
+	err = store.Remove(5)
+	if err == nil {
+		t.Error("Expected error removing invalid index, got nil")
+	}
+
+	err = store.Remove(-1)
+	if err == nil {
+		t.Error("Expected error removing negative index, got nil")
+	}
+}
+
+func TestFileStoreEmptyFile(t *testing.T) {
+	// Create a temporary directory for test files
+	dir, err := ioutil.TempDir("", "taskmgr_empty_test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(dir) // Clean up
+
+	testFile := filepath.Join(dir, "empty.json")
+	// Create empty file
+	ioutil.WriteFile(testFile, []byte(""), 0644)
+
+	store := NewFileStore(testFile)
+	list := store.List()
+	if len(list) != 0 {
+		t.Errorf("Expected empty list from empty file, got %d tasks", len(list))
+	}
+}
+
+func TestFileStoreCorruptedFile(t *testing.T) {
+	// Create a temporary directory for test files
+	dir, err := ioutil.TempDir("", "taskmgr_corrupt_test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(dir) // Clean up
+
+	testFile := filepath.Join(dir, "corrupt.json")
+	// Create corrupted JSON file
+	ioutil.WriteFile(testFile, []byte("invalid json"), 0644)
+
+	store := NewFileStore(testFile)
+	// Should handle corrupted file gracefully
+	err = store.Add(Task{Title: "Test"})
+	if err == nil {
+		t.Error("Expected error when adding to corrupted file, got nil")
+	}
+}
