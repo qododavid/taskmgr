@@ -1,7 +1,7 @@
 version = "1.0"
 
 # Default model for all commands (can be overridden per command)
-model = "claude-3-sonnet"
+model = "claude-4-sonnet"
 
 # Import other agent configurations if needed
 # imports = ["agents/shared.toml"]
