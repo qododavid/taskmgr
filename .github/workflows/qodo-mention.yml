@@ -22,7 +22,7 @@ jobs:
         with:
           prompt: "qodo-mention"
           qodo-version: 0.1.93
-          # agentfile: "${{ github.workspace }}/agent.toml"
+          agentfile: "${{ github.workspace }}/agent.toml"
         env:
           QODO_API_KEY: ${{ secrets.QODO_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
