@@ -29,7 +29,7 @@ jobs:
         uses: qodo-ai/qodo-gen-cli@main
         with:
           prompt: "qodo-cover"
-          # agentfile: "${{ github.workspace }}/agent.toml"
+          agentfile: "${{ github.workspace }}/agent.toml"
           key-value-pairs: |
             desired_coverage=90
         env:
