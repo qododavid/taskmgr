@@ -251,6 +251,8 @@ For maximum efficiency, whenever you need to perform multiple independent operat
 # Available tools for this command
 available_tools = ["filesystem", "shell", "sequential-thinking"]
 
+arguments = []
+
 # MCP server configuration for shell access
 mcpServers = """
 {
