@@ -1,0 +1,27 @@
+name: Qodo Mention Bot
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+permissions:
+  issues: write
+  pull-requests: write
+  contents: write
+
+jobs:
+  respond:
+    if: ${{ startsWith(github.event.comment.body, '@qodo ') }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Run Qodo Mention Bot
+        uses: qododavid/qodo-gen-cli@main
+        with:
+          prompt: "qodo-mention"
+          agentfile: "${{ github.workspace }}/agent.toml"
+        env:
+          QODO_API_KEY: ${{ secrets.QODO_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
