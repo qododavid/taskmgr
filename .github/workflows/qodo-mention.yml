@@ -17,10 +17,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Echo the event
-        run: |
-          echo "Event: ${{ toJson(github.event) }}"
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -29,7 +25,8 @@ jobs:
         with:
           prompt: "qodo-mention"
           agentfile: "${{ github.workspace }}/agent.toml"
+          key-value-pairs: |
+            event_path: ${{ github.event_path }}
         env:
           QODO_API_KEY: ${{ secrets.QODO_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_EVENT_PATH: ${{ env.GITHUB_EVENT_PATH }}

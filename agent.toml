@@ -251,7 +251,9 @@ For maximum efficiency, whenever you need to perform multiple independent operat
 # Available tools for this command
 available_tools = ["filesystem", "shell", "sequential-thinking"]
 
-arguments = []
+arguments = [
+    { name = "event_path", type = "string", required = true, description = "Path to the GitHub event file" }
+]
 
 # MCP server configuration for shell access
 mcpServers = """
@@ -294,7 +296,7 @@ Your mission: **understand what the user is asking and provide helpful, actionab
    ```bash
    # Add eyes emoji reaction to the comment that mentioned us
    # Get comment ID from the GitHub event data
-   COMMENT_ID=$(cat "$GITHUB_EVENT_PATH" | jq -r '.comment.id')
+   COMMENT_ID=$(cat "${event_path}" | jq -r '.comment.id')
    REPO="${GITHUB_REPOSITORY}"
    
    # Add the eyes emoji reaction
