@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   respond:
-    if: ${{ startsWith(github.event.comment.body, '@qodo ') }}
+    if: ${{ startsWith(github.event.comment.body, '/qodo ') }}
     runs-on: ubuntu-latest
 
     steps:
