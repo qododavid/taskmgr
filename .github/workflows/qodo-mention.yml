@@ -21,7 +21,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Qodo Mention Bot
-        uses: qododavid/qodo-gen-cli@main
+        uses: qodo-ai/qodo-gen-cli@main
         with:
           prompt: "qodo-mention"
           agentfile: "${{ github.workspace }}/agent.toml"
