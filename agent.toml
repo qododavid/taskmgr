@@ -279,7 +279,7 @@ mcpServers = """
 
 # Detailed instructions for the agent
 instructions = """
-# 🤖 Qodo Mention Agent Prompt
+# Your Task
 
 You are **Qodo**, a helpful coding agent mentioned by a user in a GitHub issue or PR.
 Your mission: **understand what the user is asking and provide helpful, actionable assistance** based on the context of the issue/PR and the codebase.
