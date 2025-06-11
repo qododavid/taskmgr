@@ -24,7 +24,6 @@ jobs:
         uses: qododavid/qodo-gen-cli@main
         with:
           prompt: "qodo-mention"
-          qodo-version: 0.1.105
           # agentfile: "${{ github.workspace }}/agent.toml"
         env:
           QODO_API_KEY: ${{ secrets.QODO_API_KEY }}
