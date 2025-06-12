@@ -1,0 +1,32 @@
+name: Release Notes Generator (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_tag:
+        description: "Generate notes up to (and including) this tag; blank = HEAD"
+        required: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: read
+  id-token: write
+
+jobs:
+  release_notes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Qodo release-notes agent
+        uses: qodo-ai/qodo-gen-cli@main
+        with:
+          prompt: qodo-release-notes
+          agentfile: "${{ github.workspace }}/agent.toml"
+          key-value-pairs: |
+            target_tag=${{ github.event.inputs.target_tag }}
+            notes_file=RELEASE_NOTES.md
+        env:
+          QODO_API_KEY: ${{ secrets.QODO_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
