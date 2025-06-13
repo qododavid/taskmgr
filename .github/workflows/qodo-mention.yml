@@ -21,10 +21,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Qodo Mention Bot
-        uses: qodo-ai/qodo-gen-cli@main
+        uses: qodo-ai/qodo-gen-cli@v1
         with:
           prompt: "qodo-mention"
-          agentfile: "${{ github.workspace }}/agent.toml"
+          # agentfile: "${{ github.workspace }}/agent.toml"
           key-value-pairs: |
             event_path=${{ github.event_path }}
         env:
