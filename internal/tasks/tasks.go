@@ -1,11 +1,40 @@
 package tasks
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+	"time"
+)
+
+type Priority int
+
+const (
+	Low Priority = iota
+	Medium
+	High
+	Critical
+)
+
+func (p Priority) String() string {
+	return []string{"low", "medium", "high", "critical"}[p]
+}
+
+func (p Priority) Color() string {
+	colors := []string{"\033[32m", "\033[33m", "\033[31m", "\033[35m"} // green, yellow, red, magenta
+	return colors[p]
+}
+
+func (p Priority) ColorReset() string {
+	return "\033[0m"
+}
 
 type Task struct {
 	Title       string
 	Description string
 	Done        bool
+	Priority    Priority
+	DueDate     *time.Time
+	CreatedAt   time.Time
 }
 
 type TaskManager struct {
@@ -17,6 +46,10 @@ func NewTaskManager(s Store) *TaskManager {
 }
 
 func (tm *TaskManager) Add(t Task) error {
+	// Set default values for new fields if not set
+	if t.CreatedAt.IsZero() {
+		t.CreatedAt = time.Now()
+	}
 	return tm.store.Add(t)
 }
 
@@ -77,6 +110,10 @@ func parseIndex(s string) (int, error) {
 func (tm *TaskManager) BulkAdd(tasksToAdd []Task) error {
 	// Adds multiple tasks; if you don't test this, coverage will drop.
 	for _, t := range tasksToAdd {
+		// Set default values for new fields if not set
+		if t.CreatedAt.IsZero() {
+			t.CreatedAt = time.Now()
+		}
 		if err := tm.store.Add(t); err != nil {
 			return err
 		}
@@ -142,4 +179,100 @@ func (tm *TaskManager) UndoDone(indexStr string) error {
 	}
 	t.Done = false
 	return tm.store.Update(idx, t)
+}
+
+// New filtering methods for priority and due dates
+func (tm *TaskManager) ListByPriority(priority Priority) []Task {
+	tasks := tm.store.List()
+	var filtered []Task
+	for _, t := range tasks {
+		if t.Priority == priority {
+			filtered = append(filtered, t)
+		}
+	}
+	return filtered
+}
+
+func (tm *TaskManager) ListOverdue() []Task {
+	tasks := tm.store.List()
+	var overdue []Task
+	now := time.Now()
+	for _, t := range tasks {
+		if t.DueDate != nil && t.DueDate.Before(now) && !t.Done {
+			overdue = append(overdue, t)
+		}
+	}
+	return overdue
+}
+
+func (tm *TaskManager) ListDueToday() []Task {
+	tasks := tm.store.List()
+	var dueToday []Task
+	now := time.Now()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	tomorrow := today.AddDate(0, 0, 1)
+	for _, t := range tasks {
+		if t.DueDate != nil && !t.DueDate.Before(today) && t.DueDate.Before(tomorrow) {
+			dueToday = append(dueToday, t)
+		}
+	}
+	return dueToday
+}
+
+func (tm *TaskManager) ListDueWithin(days int) []Task {
+	tasks := tm.store.List()
+	var dueWithin []Task
+	now := time.Now()
+	cutoff := now.AddDate(0, 0, days)
+	for _, t := range tasks {
+		if t.DueDate != nil && !t.DueDate.Before(now) && t.DueDate.Before(cutoff) {
+			dueWithin = append(dueWithin, t)
+		}
+	}
+	return dueWithin
+}
+
+// Helper function to parse priority from string
+func ParsePriority(s string) (Priority, error) {
+	switch strings.ToLower(s) {
+	case "low", "l":
+		return Low, nil
+	case "medium", "med", "m":
+		return Medium, nil
+	case "high", "h":
+		return High, nil
+	case "critical", "crit", "c":
+		return Critical, nil
+	default:
+		return Medium, fmt.Errorf("invalid priority: %s", s)
+	}
+}
+
+// Helper function to parse due date from string
+func ParseDueDate(input string) (*time.Time, error) {
+	if input == "" {
+		return nil, nil
+	}
+	
+	now := time.Now()
+	switch strings.ToLower(input) {
+	case "today":
+		return &now, nil
+	case "tomorrow":
+		tomorrow := now.AddDate(0, 0, 1)
+		return &tomorrow, nil
+	case "next week":
+		nextWeek := now.AddDate(0, 0, 7)
+		return &nextWeek, nil
+	default:
+		// Try parsing as date format (YYYY-MM-DD)
+		if parsed, err := time.Parse("2006-01-02", input); err == nil {
+			return &parsed, nil
+		}
+		// Try parsing as date format (MM/DD/YYYY)
+		if parsed, err := time.Parse("01/02/2006", input); err == nil {
+			return &parsed, nil
+		}
+		return nil, fmt.Errorf("invalid date format: %s (use YYYY-MM-DD, MM/DD/YYYY, 'today', 'tomorrow', or 'next week')", input)
+	}
 }

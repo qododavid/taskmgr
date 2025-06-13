@@ -30,11 +30,37 @@ func main() {
 
 	switch cmd {
 	case "add":
-		if len(args) < 1 {
-			fmt.Println("Usage: taskmgr add <title>")
+		opts := cli.ParseAddCommand(args)
+		if opts.Title == "" {
+			fmt.Println("Usage: taskmgr add <title> [--priority=<low|medium|high|critical>] [--due=<date>]")
+			fmt.Println("Examples:")
+			fmt.Println("  taskmgr add \"Fix bug\" --priority=high --due=2024-01-15")
+			fmt.Println("  taskmgr add \"Review PR\" --priority=medium --due=tomorrow")
 			os.Exit(1)
 		}
-		t := tasks.Task{Title: args[0]}
+		
+		t := tasks.Task{Title: opts.Title, Priority: tasks.Medium} // Default priority
+		
+		// Parse priority if provided
+		if opts.Priority != "" {
+			if priority, err := tasks.ParsePriority(opts.Priority); err != nil {
+				fmt.Println("Error parsing priority:", err)
+				os.Exit(1)
+			} else {
+				t.Priority = priority
+			}
+		}
+		
+		// Parse due date if provided
+		if opts.Due != "" {
+			if dueDate, err := tasks.ParseDueDate(opts.Due); err != nil {
+				fmt.Println("Error parsing due date:", err)
+				os.Exit(1)
+			} else {
+				t.DueDate = dueDate
+			}
+		}
+		
 		err := manager.Add(t)
 		if err != nil {
 			fmt.Println("Error adding task:", err)
@@ -43,13 +69,50 @@ func main() {
 		}
 		fmt.Println("Task added.")
 	case "list":
-		all := manager.List()
-		for i, t := range all {
+		opts := cli.ParseListCommand(args)
+		var tasksToShow []tasks.Task
+		
+		// Apply filters
+		if opts.Priority != "" {
+			if priority, err := tasks.ParsePriority(opts.Priority); err != nil {
+				fmt.Println("Error parsing priority:", err)
+				os.Exit(1)
+			} else {
+				tasksToShow = manager.ListByPriority(priority)
+			}
+		} else if opts.Overdue {
+			tasksToShow = manager.ListOverdue()
+		} else if opts.DueToday {
+			tasksToShow = manager.ListDueToday()
+		} else if opts.DueWithin > 0 {
+			tasksToShow = manager.ListDueWithin(opts.DueWithin)
+		} else {
+			tasksToShow = manager.List()
+		}
+		
+		// Display tasks with enhanced formatting
+		for i, t := range tasksToShow {
 			done := " "
 			if t.Done {
 				done = "x"
 			}
-			fmt.Printf("%d: [%s] %s\n", i, done, t.Title)
+			
+			// Format priority with color
+			priorityStr := fmt.Sprintf("%s[%s]%s", t.Priority.Color(), strings.ToUpper(t.Priority.String()[:3]), t.Priority.ColorReset())
+			
+			// Format due date
+			dueDateStr := ""
+			if t.DueDate != nil {
+				now := time.Now()
+				if t.DueDate.Before(now) && !t.Done {
+					// Overdue - red
+					dueDateStr = fmt.Sprintf(" \033[31m(Due: %s) ⚠️\033[0m", t.DueDate.Format("2006-01-02"))
+				} else {
+					dueDateStr = fmt.Sprintf(" (Due: %s)", t.DueDate.Format("2006-01-02"))
+				}
+			}
+			
+			fmt.Printf("%d: [%s] %s %s%s\n", i, done, priorityStr, t.Title, dueDateStr)
 		}
 	case "done":
 		if len(args) < 1 {
@@ -150,8 +213,10 @@ func main() {
 	default:
 		fmt.Println("Usage: taskmgr [command] ...")
 		fmt.Println("Available commands:")
-		fmt.Println("  add <title>            - Add a new task")
-		fmt.Println("  list                   - List all tasks")
+		fmt.Println("  add <title> [--priority=<low|medium|high|critical>] [--due=<date>]")
+		fmt.Println("                         - Add a new task with optional priority and due date")
+		fmt.Println("  list [--priority=<priority>] [--overdue] [--due-today] [--due-within=<days>]")
+		fmt.Println("                         - List tasks with optional filters")
 		fmt.Println("  done <index>           - Mark a task as done")
 		fmt.Println("  remove <index>         - Remove a task")
 		fmt.Println("  undodone <index>       - Mark a completed task as not done")
@@ -160,6 +225,14 @@ func main() {
 		fmt.Println("  countdone              - Count completed tasks")
 		fmt.Println("  markall                - Mark all tasks as done")
 		fmt.Println("  findbydesc <desc>      - Find tasks by description")
+		fmt.Println("")
+		fmt.Println("Examples:")
+		fmt.Println("  taskmgr add \"Fix bug\" --priority=high --due=2024-01-15")
+		fmt.Println("  taskmgr add \"Review PR\" --priority=medium --due=tomorrow")
+		fmt.Println("  taskmgr list --priority=high")
+		fmt.Println("  taskmgr list --overdue")
+		fmt.Println("  taskmgr list --due-today")
+		fmt.Println("  taskmgr list --due-within=7days")
 		os.Exit(1)
 	}
 }
