@@ -11,6 +11,7 @@ import (
 	"github.com/getsentry/sentry-go"
 
 	"taskmgr/internal/cli"
+	"taskmgr/internal/display"
 	"taskmgr/internal/tasks"
 )
 
@@ -90,29 +91,47 @@ func main() {
 			tasksToShow = manager.List()
 		}
 		
+		// Create display options
+		displayOpts := display.DisplayOptions{
+			ShowColors:   display.IsColorSupported(),
+			ShowIcons:    true,
+			TableFormat:  false,
+			ShowTags:     true,
+			ShowDueDate:  true,
+			ShowPriority: true,
+			ColorScheme:  display.DefaultColorScheme,
+		}
+		
+		// Check for format flags
+		for _, arg := range args {
+			if arg == "--table" {
+				displayOpts.TableFormat = true
+			}
+			if arg == "--no-color" {
+				displayOpts.ShowColors = false
+			}
+			if arg == "--no-icons" {
+				displayOpts.ShowIcons = false
+			}
+			if arg == "--minimal" {
+				displayOpts.ShowTags = false
+				displayOpts.ShowDueDate = false
+				displayOpts.ShowPriority = false
+				displayOpts.ShowIcons = false
+			}
+		}
+		
+		formatter := display.NewTaskFormatter(displayOpts)
+		
+		// Display table header if in table format
+		if displayOpts.TableFormat {
+			fmt.Println(formatter.FormatTableHeader())
+			fmt.Println(formatter.FormatTableSeparator())
+		}
+		
 		// Display tasks with enhanced formatting
 		for i, t := range tasksToShow {
-			done := " "
-			if t.Done {
-				done = "x"
-			}
-			
-			// Format priority with color
-			priorityStr := fmt.Sprintf("%s[%s]%s", t.Priority.Color(), strings.ToUpper(t.Priority.String()[:3]), t.Priority.ColorReset())
-			
-			// Format due date
-			dueDateStr := ""
-			if t.DueDate != nil {
-				now := time.Now()
-				if t.DueDate.Before(now) && !t.Done {
-					// Overdue - red
-					dueDateStr = fmt.Sprintf(" \033[31m(Due: %s) ⚠️\033[0m", t.DueDate.Format("2006-01-02"))
-				} else {
-					dueDateStr = fmt.Sprintf(" (Due: %s)", t.DueDate.Format("2006-01-02"))
-				}
-			}
-			
-			fmt.Printf("%d: [%s] %s %s%s\n", i, done, priorityStr, t.Title, dueDateStr)
+			fmt.Println(formatter.FormatTask(i, t))
 		}
 	case "done":
 		if len(args) < 1 {
@@ -206,6 +225,24 @@ func main() {
 			}
 			fmt.Printf("%d: [%s] %s\n", i, done, t.Title)
 		}
+	case "stats":
+		tasks := manager.List()
+		displayOpts := display.DisplayOptions{
+			ShowColors:   display.IsColorSupported(),
+			ShowIcons:    true,
+			ColorScheme:  display.DefaultColorScheme,
+		}
+		
+		// Check for no-color flag
+		for _, arg := range args {
+			if arg == "--no-color" {
+				displayOpts.ShowColors = false
+			}
+		}
+		
+		progressFormatter := display.NewProgressFormatter(displayOpts)
+		stats := progressFormatter.CalculateStats(tasks)
+		fmt.Println(progressFormatter.FormatDetailedStats(stats))
 	case "error":
 		// Trigger an error to test sentry.
 		err := errors.New("test error. create gh issue?")
@@ -215,24 +252,35 @@ func main() {
 		fmt.Println("Available commands:")
 		fmt.Println("  add <title> [--priority=<low|medium|high|critical>] [--due=<date>]")
 		fmt.Println("                         - Add a new task with optional priority and due date")
-		fmt.Println("  list [--priority=<priority>] [--overdue] [--due-today] [--due-within=<days>]")
-		fmt.Println("                         - List tasks with optional filters")
-		fmt.Println("  done <index>           - Mark a task as done")
-		fmt.Println("  remove <index>         - Remove a task")
-		fmt.Println("  undodone <index>       - Mark a completed task as not done")
-		fmt.Println("  find <title>           - Find task by title")
-		fmt.Println("  bulkadd <t1,t2,...>    - Add multiple tasks at once")
-		fmt.Println("  countdone              - Count completed tasks")
-		fmt.Println("  markall                - Mark all tasks as done")
-		fmt.Println("  findbydesc <desc>      - Find tasks by description")
+		fmt.Println("  list [filters] [options] - List tasks with optional filters and formatting")
+		fmt.Println("    Filters:")
+		fmt.Println("      --priority=<priority>  - Filter by priority level")
+		fmt.Println("      --overdue              - Show only overdue tasks")
+		fmt.Println("      --due-today            - Show tasks due today")
+		fmt.Println("      --due-within=<days>    - Show tasks due within N days")
+		fmt.Println("    Display Options:")
+		fmt.Println("      --table                - Display in table format")
+		fmt.Println("      --no-color             - Disable colored output")
+		fmt.Println("      --no-icons             - Disable emoji icons")
+		fmt.Println("      --minimal              - Minimal output (no colors, icons, or extra info)")
+		fmt.Println("  stats [--no-color]      - Show progress statistics and task breakdown")
+		fmt.Println("  done <index>             - Mark a task as done")
+		fmt.Println("  remove <index>           - Remove a task")
+		fmt.Println("  undodone <index>         - Mark a completed task as not done")
+		fmt.Println("  find <title>             - Find task by title")
+		fmt.Println("  bulkadd <t1,t2,...>      - Add multiple tasks at once")
+		fmt.Println("  countdone                - Count completed tasks")
+		fmt.Println("  markall                  - Mark all tasks as done")
+		fmt.Println("  findbydesc <desc>        - Find tasks by description")
 		fmt.Println("")
 		fmt.Println("Examples:")
 		fmt.Println("  taskmgr add \"Fix bug\" --priority=high --due=2024-01-15")
 		fmt.Println("  taskmgr add \"Review PR\" --priority=medium --due=tomorrow")
-		fmt.Println("  taskmgr list --priority=high")
-		fmt.Println("  taskmgr list --overdue")
+		fmt.Println("  taskmgr list --priority=high --table")
+		fmt.Println("  taskmgr list --overdue --no-color")
 		fmt.Println("  taskmgr list --due-today")
-		fmt.Println("  taskmgr list --due-within=7days")
+		fmt.Println("  taskmgr list --due-within=7days --minimal")
+		fmt.Println("  taskmgr stats")
 		os.Exit(1)
 	}
 }
