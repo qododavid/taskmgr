@@ -1,3 +1,14 @@
+## v0.3.0 - 2025-06-14
+
+### ✨ Features
+* feat: Add colorized output & better formatting (#39) - https://github.com/qododavid/taskmgr/pull/39
+* feat: implement task categories/tags system (#41) - https://github.com/qododavid/taskmgr/pull/41
+
+### 🧪 Tests
+* test: Add coverage for PR #36 (#37) - https://github.com/qododavid/taskmgr/pull/37
+* test: Add coverage for PR #39 (#40) - https://github.com/qododavid/taskmgr/pull/40
+* test: Add coverage for PR #41 tag functionality (#42) - https://github.com/qododavid/taskmgr/pull/42
+
 ## v0.2.0 - 2025-06-13
 
 ### ✨ Features
