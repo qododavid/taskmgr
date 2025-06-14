@@ -80,6 +80,7 @@ func TestFormatListItem(t *testing.T) {
 		Done:        false,
 		Priority:    tasks.Medium,
 		DueDate:     &dueDate,
+		Tags:        []string{"work", "urgent"},
 	}
 	
 	opts := DisplayOptions{
@@ -99,8 +100,8 @@ func TestFormatListItem(t *testing.T) {
 	if !strings.Contains(result, "[MED]") {
 		t.Error("Should contain priority")
 	}
-	if !strings.Contains(result, "Test Description") {
-		t.Error("Should contain description as tag")
+	if !strings.Contains(result, "work, urgent") {
+		t.Error("Should contain tags")
 	}
 	if !strings.Contains(result, "Due:") {
 		t.Error("Should contain due date")
@@ -123,8 +124,8 @@ func TestFormatTableRow(t *testing.T) {
 	result := formatter.formatTableRow(1, task)
 	
 	parts := strings.Split(result, "|")
-	if len(parts) < 5 {
-		t.Error("Table row should have at least 5 columns")
+	if len(parts) < 6 {
+		t.Error("Table row should have at least 6 columns")
 	}
 	
 	if !strings.Contains(result, "Test Task") {
@@ -137,7 +138,7 @@ func TestFormatTableHeader(t *testing.T) {
 	formatter := NewTaskFormatter(opts)
 	
 	header := formatter.FormatTableHeader()
-	expectedColumns := []string{"ID", "Status", "Priority", "Title", "Due Date"}
+	expectedColumns := []string{"ID", "Status", "Priority", "Title", "Tags", "Due Date"}
 	
 	for _, col := range expectedColumns {
 		if !strings.Contains(header, col) {

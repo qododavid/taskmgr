@@ -56,10 +56,9 @@ func (tf *TaskFormatter) formatListItem(index int, task tasks.Task) string {
 		parts = append(parts, priority)
 	}
 	
-	// Tags (placeholder for future implementation)
-	if tf.options.ShowTags && len(task.Description) > 0 {
-		// For now, treat description as a tag-like element
-		tags := tf.formatDescription(task.Description)
+	// Tags
+	if tf.options.ShowTags && len(task.Tags) > 0 {
+		tags := tf.formatTags(task.Tags)
 		parts = append(parts, tags)
 	}
 	
@@ -78,19 +77,24 @@ func (tf *TaskFormatter) formatTableRow(index int, task tasks.Task) string {
 	priority := tf.formatPriority(task.Priority)
 	title := tf.formatTitle(task)
 	
+	tags := ""
+	if len(task.Tags) > 0 {
+		tags = tf.formatTags(task.Tags)
+	}
+	
 	dueDate := "N/A"
 	if task.DueDate != nil {
 		dueDate = tf.formatDueDate(*task.DueDate, task.Done)
 	}
 	
 	// Format as table row with fixed widths
-	return fmt.Sprintf("%-3d | %-6s | %-8s | %-30s | %s", 
-		index, status, priority, truncateString(title, 30), dueDate)
+	return fmt.Sprintf("%-3d | %-6s | %-8s | %-25s | %-15s | %s", 
+		index, status, priority, truncateString(title, 25), truncateString(tags, 15), dueDate)
 }
 
 // FormatTableHeader returns the table header
 func (tf *TaskFormatter) FormatTableHeader() string {
-	header := "ID  | Status | Priority | Title                          | Due Date"
+	header := "ID  | Status | Priority | Title                     | Tags            | Due Date"
 	if tf.options.ShowColors {
 		return Colorize(Bold, header)
 	}
@@ -99,7 +103,7 @@ func (tf *TaskFormatter) FormatTableHeader() string {
 
 // FormatTableSeparator returns the table separator line
 func (tf *TaskFormatter) FormatTableSeparator() string {
-	return "----+--------+----------+--------------------------------+----------"
+	return "----+--------+----------+---------------------------+-----------------+----------"
 }
 
 // getStatusIcon returns the appropriate status icon for a task
@@ -178,6 +182,20 @@ func (tf *TaskFormatter) formatPriority(priority tasks.Priority) string {
 	
 	text := fmt.Sprintf("[%s %s]", icon, strings.ToUpper(priority.String()[:3]))
 	return Colorize(color, text)
+}
+
+// formatTags formats the task tags
+func (tf *TaskFormatter) formatTags(tags []string) string {
+	if len(tags) == 0 {
+		return ""
+	}
+	
+	tagStr := strings.Join(tags, ", ")
+	if !tf.options.ShowColors {
+		return fmt.Sprintf("[%s]", tagStr)
+	}
+	
+	return fmt.Sprintf("[%s]", Colorize(tf.options.ColorScheme.Tags, tagStr))
 }
 
 // formatDescription formats the task description as a tag-like element

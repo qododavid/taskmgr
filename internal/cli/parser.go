@@ -8,6 +8,7 @@ type AddOptions struct {
 	Title    string
 	Priority string
 	Due      string
+	Tags     []string
 }
 
 type ListOptions struct {
@@ -15,6 +16,7 @@ type ListOptions struct {
 	Overdue    bool
 	DueToday   bool
 	DueWithin  int
+	Tag        string
 }
 
 func ParseArgs(args []string) (string, []string) {
@@ -33,10 +35,26 @@ func ParseAddCommand(args []string) AddOptions {
 			opts.Priority = strings.TrimPrefix(arg, "--priority=")
 		} else if strings.HasPrefix(arg, "--due=") {
 			opts.Due = strings.TrimPrefix(arg, "--due=")
+		} else if strings.HasPrefix(arg, "--tags=") {
+			tagStr := strings.TrimPrefix(arg, "--tags=")
+			tags := strings.Split(tagStr, ",")
+			// Clean up tags
+			for j, tag := range tags {
+				tags[j] = strings.ToLower(strings.TrimSpace(tag))
+			}
+			opts.Tags = tags
 		} else if arg == "--priority" && i+1 < len(args) {
 			opts.Priority = args[i+1]
 		} else if arg == "--due" && i+1 < len(args) {
 			opts.Due = args[i+1]
+		} else if arg == "--tags" && i+1 < len(args) {
+			tagStr := args[i+1]
+			tags := strings.Split(tagStr, ",")
+			// Clean up tags
+			for j, tag := range tags {
+				tags[j] = strings.ToLower(strings.TrimSpace(tag))
+			}
+			opts.Tags = tags
 		} else if !strings.HasPrefix(arg, "--") && opts.Title == "" {
 			// First non-flag argument is the title
 			opts.Title = arg
@@ -53,8 +71,12 @@ func ParseListCommand(args []string) ListOptions {
 	for i, arg := range args {
 		if strings.HasPrefix(arg, "--priority=") {
 			opts.Priority = strings.TrimPrefix(arg, "--priority=")
+		} else if strings.HasPrefix(arg, "--tag=") {
+			opts.Tag = strings.TrimPrefix(arg, "--tag=")
 		} else if arg == "--priority" && i+1 < len(args) {
 			opts.Priority = args[i+1]
+		} else if arg == "--tag" && i+1 < len(args) {
+			opts.Tag = args[i+1]
 		} else if arg == "--overdue" {
 			opts.Overdue = true
 		} else if arg == "--due-today" {
