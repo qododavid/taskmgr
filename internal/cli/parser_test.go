@@ -53,6 +53,26 @@ func TestParseAddCommand(t *testing.T) {
 			args: []string{},
 			expected: AddOptions{},
 		},
+		{
+			name: "title with tags flag",
+			args: []string{"Fix bug", "--tags=work,urgent"},
+			expected: AddOptions{Title: "Fix bug", Tags: []string{"work", "urgent"}},
+		},
+		{
+			name: "title with tags space separator",
+			args: []string{"Fix bug", "--tags", "personal,shopping"},
+			expected: AddOptions{Title: "Fix bug", Tags: []string{"personal", "shopping"}},
+		},
+		{
+			name: "title with all flags including tags",
+			args: []string{"Fix bug", "--priority=high", "--due=tomorrow", "--tags=work,urgent,bug"},
+			expected: AddOptions{Title: "Fix bug", Priority: "high", Due: "tomorrow", Tags: []string{"work", "urgent", "bug"}},
+		},
+		{
+			name: "tags with spaces and mixed case",
+			args: []string{"Fix bug", "--tags=Work, URGENT , Bug"},
+			expected: AddOptions{Title: "Fix bug", Tags: []string{"work", "urgent", "bug"}},
+		},
 	}
 
 	for _, tt := range tests {
@@ -66,6 +86,15 @@ func TestParseAddCommand(t *testing.T) {
 			}
 			if result.Due != tt.expected.Due {
 				t.Errorf("Expected due '%s', got '%s'", tt.expected.Due, result.Due)
+			}
+			// Check tags
+			if len(result.Tags) != len(tt.expected.Tags) {
+				t.Errorf("Expected %d tags, got %d", len(tt.expected.Tags), len(result.Tags))
+			}
+			for i, tag := range tt.expected.Tags {
+				if i >= len(result.Tags) || result.Tags[i] != tag {
+					t.Errorf("Expected tag[%d] '%s', got '%s'", i, tag, result.Tags[i])
+				}
 			}
 		})
 	}
@@ -117,6 +146,21 @@ func TestParseListCommand(t *testing.T) {
 			args: []string{"--priority=medium", "--overdue"},
 			expected: ListOptions{Priority: "medium", Overdue: true},
 		},
+		{
+			name: "tag filter",
+			args: []string{"--tag=work"},
+			expected: ListOptions{Tag: "work"},
+		},
+		{
+			name: "tag with space separator",
+			args: []string{"--tag", "personal"},
+			expected: ListOptions{Tag: "personal"},
+		},
+		{
+			name: "tag with priority filter",
+			args: []string{"--tag=urgent", "--priority=high"},
+			expected: ListOptions{Tag: "urgent", Priority: "high"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -133,6 +177,9 @@ func TestParseListCommand(t *testing.T) {
 			}
 			if result.DueWithin != tt.expected.DueWithin {
 				t.Errorf("Expected due within %d, got %d", tt.expected.DueWithin, result.DueWithin)
+			}
+			if result.Tag != tt.expected.Tag {
+				t.Errorf("Expected tag '%s', got '%s'", tt.expected.Tag, result.Tag)
 			}
 		})
 	}

@@ -276,6 +276,225 @@ func TestTaskManagerWithDueDates(t *testing.T) {
 	// Within 10 days should include: due today, due tomorrow, due next week (3 tasks)
 	dueWithin10Days := manager.ListDueWithin(10)
 	if len(dueWithin10Days) != 3 {
-		t.Errorf("Expected 3 tasks due within 10 days, got %d: %v", len(dueWithin10Days), dueWithin10Days)
+	t.Errorf("Expected 3 tasks due within 10 days, got %d: %v", len(dueWithin10Days), dueWithin10Days)
+	}
+	}
+
+func TestTaskTagMethods(t *testing.T) {
+	task := Task{Title: "Test Task"}
+
+	// Test HasTag on empty task
+	if task.HasTag("work") {
+		t.Error("Empty task should not have any tags")
+	}
+
+	// Test AddTag
+	task.AddTag("work")
+	if !task.HasTag("work") {
+		t.Error("Task should have 'work' tag after adding it")
+	}
+	if len(task.Tags) != 1 {
+		t.Errorf("Expected 1 tag, got %d", len(task.Tags))
+	}
+
+	// Test adding duplicate tag
+	task.AddTag("work")
+	if len(task.Tags) != 1 {
+		t.Error("Adding duplicate tag should not increase tag count")
+	}
+
+	// Test adding multiple tags
+	task.AddTag("urgent")
+	task.AddTag("bug")
+	if len(task.Tags) != 3 {
+		t.Errorf("Expected 3 tags, got %d", len(task.Tags))
+	}
+	if !task.HasTag("urgent") || !task.HasTag("bug") {
+		t.Error("Task should have all added tags")
+	}
+
+	// Test case insensitive HasTag
+	if !task.HasTag("WORK") || !task.HasTag("Work") {
+		t.Error("HasTag should be case insensitive")
+	}
+
+	// Test RemoveTag
+	task.RemoveTag("work")
+	if task.HasTag("work") {
+		t.Error("Task should not have 'work' tag after removing it")
+	}
+	if len(task.Tags) != 2 {
+		t.Errorf("Expected 2 tags after removal, got %d", len(task.Tags))
+	}
+
+	// Test removing non-existent tag
+	task.RemoveTag("nonexistent")
+	if len(task.Tags) != 2 {
+		t.Error("Removing non-existent tag should not change tag count")
+	}
+
+	// Test case insensitive RemoveTag
+	task.RemoveTag("URGENT")
+	if task.HasTag("urgent") {
+		t.Error("RemoveTag should be case insensitive")
+	}
+	if len(task.Tags) != 1 {
+		t.Errorf("Expected 1 tag after case insensitive removal, got %d", len(task.Tags))
+	}
+
+	// Test tag normalization (lowercase and trimmed)
+	task.AddTag(" PERSONAL ")
+	if !task.HasTag("personal") {
+		t.Error("Tag should be normalized to lowercase and trimmed")
+	}
+	expectedTag := "personal"
+	found := false
+	for _, tag := range task.Tags {
+		if tag == expectedTag {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("Tag should be stored in normalized form")
+	}
+}
+
+func TestTaskManagerTagMethods(t *testing.T) {
+	// Create a temporary directory for test files
+	dir, err := ioutil.TempDir("", "taskmgr_tag_test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	testFile := filepath.Join(dir, "tasks.json")
+	store := NewFileStore(testFile)
+	manager := NewTaskManager(store)
+
+	// Add tasks with different tags
+	tasks := []Task{
+		{Title: "Work task 1", Tags: []string{"work", "urgent"}},
+		{Title: "Work task 2", Tags: []string{"work", "meeting"}},
+		{Title: "Personal task", Tags: []string{"personal", "shopping"}},
+		{Title: "Bug fix", Tags: []string{"work", "bug", "urgent"}},
+		{Title: "No tags task"},
+	}
+
+	for _, task := range tasks {
+		if err := manager.Add(task); err != nil {
+			t.Fatalf("Error adding task: %v", err)
+		}
+	}
+
+	// Test ListByTag
+	workTasks := manager.ListByTag("work")
+	if len(workTasks) != 3 {
+		t.Errorf("Expected 3 work tasks, got %d", len(workTasks))
+	}
+
+	urgentTasks := manager.ListByTag("urgent")
+	if len(urgentTasks) != 2 {
+		t.Errorf("Expected 2 urgent tasks, got %d", len(urgentTasks))
+	}
+
+	personalTasks := manager.ListByTag("personal")
+	if len(personalTasks) != 1 {
+		t.Errorf("Expected 1 personal task, got %d", len(personalTasks))
+	}
+
+	// Test case insensitive ListByTag
+	workTasksUpper := manager.ListByTag("WORK")
+	if len(workTasksUpper) != 3 {
+		t.Errorf("Expected 3 work tasks (case insensitive), got %d", len(workTasksUpper))
+	}
+
+	// Test ListByTag with non-existent tag
+	nonExistentTasks := manager.ListByTag("nonexistent")
+	if len(nonExistentTasks) != 0 {
+		t.Errorf("Expected 0 tasks for non-existent tag, got %d", len(nonExistentTasks))
+	}
+
+	// Test GetAllTags
+	allTags := manager.GetAllTags()
+	expectedTags := []string{"bug", "meeting", "personal", "shopping", "urgent", "work"} // sorted alphabetically
+	if len(allTags) != len(expectedTags) {
+		t.Errorf("Expected %d unique tags, got %d", len(expectedTags), len(allTags))
+	}
+	for i, expectedTag := range expectedTags {
+		if i >= len(allTags) || allTags[i] != expectedTag {
+			t.Errorf("Expected tag[%d] '%s', got '%s'", i, expectedTag, allTags[i])
+		}
+	}
+
+	// Test AddTagToTask
+	err = manager.AddTagToTask("4", "important") // Add tag to "No tags task"
+	if err != nil {
+		t.Errorf("Error adding tag to task: %v", err)
+	}
+
+	// Verify tag was added
+	updatedTasks := manager.List()
+	if !updatedTasks[4].HasTag("important") {
+		t.Error("Task should have 'important' tag after adding it")
+	}
+
+	// Test AddTagToTask with invalid index
+	err = manager.AddTagToTask("99", "invalid")
+	if err == nil {
+		t.Error("Expected error when adding tag to invalid index")
+	}
+
+	err = manager.AddTagToTask("invalid", "tag")
+	if err == nil {
+		t.Error("Expected error when using invalid index format")
+	}
+
+	// Test RemoveTagFromTask
+	err = manager.RemoveTagFromTask("0", "urgent") // Remove 'urgent' from first work task
+	if err != nil {
+		t.Errorf("Error removing tag from task: %v", err)
+	}
+
+	// Verify tag was removed
+	updatedTasks = manager.List()
+	if updatedTasks[0].HasTag("urgent") {
+		t.Error("Task should not have 'urgent' tag after removing it")
+	}
+	if !updatedTasks[0].HasTag("work") {
+		t.Error("Task should still have 'work' tag after removing 'urgent'")
+	}
+
+	// Test RemoveTagFromTask with non-existent tag
+	err = manager.RemoveTagFromTask("0", "nonexistent")
+	if err != nil {
+		t.Errorf("Removing non-existent tag should not return error: %v", err)
+	}
+
+	// Test RemoveTagFromTask with invalid index
+	err = manager.RemoveTagFromTask("99", "work")
+	if err == nil {
+		t.Error("Expected error when removing tag from invalid index")
+	}
+
+	err = manager.RemoveTagFromTask("invalid", "work")
+	if err == nil {
+		t.Error("Expected error when using invalid index format")
+	}
+
+	// Test persistence of tags
+	newStore := NewFileStore(testFile)
+	newManager := NewTaskManager(newStore)
+	persistentTasks := newManager.List()
+
+	// Verify the tag changes persisted
+	if persistentTasks[0].HasTag("urgent") {
+		t.Error("Removed tag should not persist")
+	}
+	if !persistentTasks[0].HasTag("work") {
+		t.Error("Remaining tags should persist")
+	}
+	if !persistentTasks[4].HasTag("important") {
+		t.Error("Added tag should persist")
 	}
 }
