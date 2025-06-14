@@ -80,6 +80,7 @@ func TestFormatListItem(t *testing.T) {
 		Done:        false,
 		Priority:    tasks.Medium,
 		DueDate:     &dueDate,
+		Tags:        []string{"work", "urgent"},
 	}
 	
 	opts := DisplayOptions{
@@ -99,8 +100,8 @@ func TestFormatListItem(t *testing.T) {
 	if !strings.Contains(result, "[MED]") {
 		t.Error("Should contain priority")
 	}
-	if !strings.Contains(result, "Test Description") {
-		t.Error("Should contain description as tag")
+	if !strings.Contains(result, "work, urgent") {
+		t.Error("Should contain tags")
 	}
 	if !strings.Contains(result, "Due:") {
 		t.Error("Should contain due date")
@@ -123,8 +124,8 @@ func TestFormatTableRow(t *testing.T) {
 	result := formatter.formatTableRow(1, task)
 	
 	parts := strings.Split(result, "|")
-	if len(parts) < 5 {
-		t.Error("Table row should have at least 5 columns")
+	if len(parts) < 6 {
+		t.Error("Table row should have at least 6 columns")
 	}
 	
 	if !strings.Contains(result, "Test Task") {
@@ -137,7 +138,7 @@ func TestFormatTableHeader(t *testing.T) {
 	formatter := NewTaskFormatter(opts)
 	
 	header := formatter.FormatTableHeader()
-	expectedColumns := []string{"ID", "Status", "Priority", "Title", "Due Date"}
+	expectedColumns := []string{"ID", "Status", "Priority", "Title", "Tags", "Due Date"}
 	
 	for _, col := range expectedColumns {
 		if !strings.Contains(header, col) {
@@ -203,6 +204,80 @@ func TestGetStatusIcon(t *testing.T) {
 			
 			if result != tt.expected {
 				t.Errorf("Expected %s, got %s", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestFormatTags(t *testing.T) {
+	tests := []struct {
+		name       string
+		tags       []string
+		showColors bool
+		expected   string
+	}{
+		{
+			name:       "empty tags",
+			tags:       []string{},
+			showColors: false,
+			expected:   "",
+		},
+		{
+			name:       "single tag without colors",
+			tags:       []string{"work"},
+			showColors: false,
+			expected:   "[work]",
+		},
+		{
+			name:       "multiple tags without colors",
+			tags:       []string{"work", "urgent", "bug"},
+			showColors: false,
+			expected:   "[work, urgent, bug]",
+		},
+		{
+			name:       "single tag with colors",
+			tags:       []string{"personal"},
+			showColors: true,
+			expected:   "[personal]", // Colors would be added but we can't easily test the exact output
+		},
+		{
+			name:       "multiple tags with colors",
+			tags:       []string{"work", "meeting"},
+			showColors: true,
+			expected:   "[work, meeting]", // Colors would be added but we can't easily test the exact output
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := DisplayOptions{
+				ShowColors: tt.showColors,
+				ColorScheme: DefaultColorScheme,
+			}
+			formatter := NewTaskFormatter(opts)
+			result := formatter.formatTags(tt.tags)
+
+			if !tt.showColors {
+				// For non-color tests, we can check exact match
+				if result != tt.expected {
+					t.Errorf("Expected %s, got %s", tt.expected, result)
+				}
+			} else {
+				// For color tests, just check that the tags are present
+				if len(tt.tags) == 0 {
+					if result != "" {
+						t.Errorf("Expected empty string for empty tags, got %s", result)
+					}
+				} else {
+					for _, tag := range tt.tags {
+						if !strings.Contains(result, tag) {
+							t.Errorf("Expected result to contain tag %s, got %s", tag, result)
+						}
+					}
+					if !strings.Contains(result, "[") || !strings.Contains(result, "]") {
+						t.Errorf("Expected result to be wrapped in brackets, got %s", result)
+					}
+				}
 			}
 		})
 	}

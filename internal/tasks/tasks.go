@@ -35,6 +35,32 @@ type Task struct {
 	Priority    Priority
 	DueDate     *time.Time
 	CreatedAt   time.Time
+	Tags        []string
+}
+
+// Helper methods for tag operations
+func (t *Task) HasTag(tag string) bool {
+	for _, existingTag := range t.Tags {
+		if strings.EqualFold(existingTag, tag) {
+			return true
+		}
+	}
+	return false
+}
+
+func (t *Task) AddTag(tag string) {
+	if !t.HasTag(tag) {
+		t.Tags = append(t.Tags, strings.ToLower(strings.TrimSpace(tag)))
+	}
+}
+
+func (t *Task) RemoveTag(tag string) {
+	for i, existingTag := range t.Tags {
+		if strings.EqualFold(existingTag, tag) {
+			t.Tags = append(t.Tags[:i], t.Tags[i+1:]...)
+			break
+		}
+	}
 }
 
 type TaskManager struct {
@@ -275,4 +301,72 @@ func ParseDueDate(input string) (*time.Time, error) {
 		}
 		return nil, fmt.Errorf("invalid date format: %s (use YYYY-MM-DD, MM/DD/YYYY, 'today', 'tomorrow', or 'next week')", input)
 	}
+}
+
+// Tag-related TaskManager methods
+func (tm *TaskManager) ListByTag(tag string) []Task {
+	tasks := tm.store.List()
+	var filtered []Task
+	for _, task := range tasks {
+		if task.HasTag(tag) {
+			filtered = append(filtered, task)
+		}
+	}
+	return filtered
+}
+
+func (tm *TaskManager) GetAllTags() []string {
+	tasks := tm.store.List()
+	tagSet := make(map[string]bool)
+	for _, task := range tasks {
+		for _, tag := range task.Tags {
+			tagSet[tag] = true
+		}
+	}
+	
+	var tags []string
+	for tag := range tagSet {
+		tags = append(tags, tag)
+	}
+	// Sort tags alphabetically
+	for i := 0; i < len(tags)-1; i++ {
+		for j := i + 1; j < len(tags); j++ {
+			if tags[i] > tags[j] {
+				tags[i], tags[j] = tags[j], tags[i]
+			}
+		}
+	}
+	return tags
+}
+
+func (tm *TaskManager) AddTagToTask(indexStr, tag string) error {
+	idx, err := parseIndex(indexStr)
+	if err != nil {
+		return err
+	}
+	
+	tasks := tm.store.List()
+	if idx < 0 || idx >= len(tasks) {
+		return fmt.Errorf("invalid index")
+	}
+	
+	task := tasks[idx]
+	task.AddTag(tag)
+	return tm.store.Update(idx, task)
+}
+
+func (tm *TaskManager) RemoveTagFromTask(indexStr, tag string) error {
+	idx, err := parseIndex(indexStr)
+	if err != nil {
+		return err
+	}
+	
+	tasks := tm.store.List()
+	if idx < 0 || idx >= len(tasks) {
+		return fmt.Errorf("invalid index")
+	}
+	
+	task := tasks[idx]
+	task.RemoveTag(tag)
+	return tm.store.Update(idx, task)
 }
