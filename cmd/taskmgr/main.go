@@ -33,14 +33,15 @@ func main() {
 	case "add":
 		opts := cli.ParseAddCommand(args)
 		if opts.Title == "" {
-			fmt.Println("Usage: taskmgr add <title> [--priority=<low|medium|high|critical>] [--due=<date>]")
+			fmt.Println("Usage: taskmgr add <title> [--priority=<low|medium|high|critical>] [--due=<date>] [--tags=<tag1,tag2,...>]")
 			fmt.Println("Examples:")
-			fmt.Println("  taskmgr add \"Fix bug\" --priority=high --due=2024-01-15")
-			fmt.Println("  taskmgr add \"Review PR\" --priority=medium --due=tomorrow")
+			fmt.Println("  taskmgr add \"Fix bug\" --priority=high --due=2024-01-15 --tags=work,urgent")
+			fmt.Println("  taskmgr add \"Review PR\" --priority=medium --due=tomorrow --tags=work,code-review")
+			fmt.Println("  taskmgr add \"Buy groceries\" --tags=personal,shopping")
 			os.Exit(1)
 		}
 		
-		t := tasks.Task{Title: opts.Title, Priority: tasks.Medium} // Default priority
+		t := tasks.Task{Title: opts.Title, Priority: tasks.Medium, Tags: opts.Tags} // Default priority
 		
 		// Parse priority if provided
 		if opts.Priority != "" {
@@ -81,6 +82,8 @@ func main() {
 			} else {
 				tasksToShow = manager.ListByPriority(priority)
 			}
+		} else if opts.Tag != "" {
+			tasksToShow = manager.ListByTag(opts.Tag)
 		} else if opts.Overdue {
 			tasksToShow = manager.ListOverdue()
 		} else if opts.DueToday {
@@ -243,6 +246,38 @@ func main() {
 		progressFormatter := display.NewProgressFormatter(displayOpts)
 		stats := progressFormatter.CalculateStats(tasks)
 		fmt.Println(progressFormatter.FormatDetailedStats(stats))
+	case "tags":
+		allTags := manager.GetAllTags()
+		if len(allTags) == 0 {
+			fmt.Println("No tags found.")
+			return
+		}
+		fmt.Println("Available tags:")
+		for _, tag := range allTags {
+			fmt.Printf("  - %s\n", tag)
+		}
+	case "tag":
+		if len(args) < 2 {
+			fmt.Println("Usage: taskmgr tag <index> <tag>")
+			os.Exit(1)
+		}
+		err := manager.AddTagToTask(args[0], args[1])
+		if err != nil {
+			fmt.Println("Error adding tag:", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Tag '%s' added to task.\n", args[1])
+	case "untag":
+		if len(args) < 2 {
+			fmt.Println("Usage: taskmgr untag <index> <tag>")
+			os.Exit(1)
+		}
+		err := manager.RemoveTagFromTask(args[0], args[1])
+		if err != nil {
+			fmt.Println("Error removing tag:", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Tag '%s' removed from task.\n", args[1])
 	case "error":
 		// Trigger an error to test sentry.
 		err := errors.New("test error. create gh issue?")
@@ -250,11 +285,12 @@ func main() {
 	default:
 		fmt.Println("Usage: taskmgr [command] ...")
 		fmt.Println("Available commands:")
-		fmt.Println("  add <title> [--priority=<low|medium|high|critical>] [--due=<date>]")
-		fmt.Println("                         - Add a new task with optional priority and due date")
+		fmt.Println("  add <title> [--priority=<low|medium|high|critical>] [--due=<date>] [--tags=<tag1,tag2,...>]")
+		fmt.Println("                         - Add a new task with optional priority, due date, and tags")
 		fmt.Println("  list [filters] [options] - List tasks with optional filters and formatting")
 		fmt.Println("    Filters:")
 		fmt.Println("      --priority=<priority>  - Filter by priority level")
+		fmt.Println("      --tag=<tag>            - Filter by tag")
 		fmt.Println("      --overdue              - Show only overdue tasks")
 		fmt.Println("      --due-today            - Show tasks due today")
 		fmt.Println("      --due-within=<days>    - Show tasks due within N days")
@@ -264,6 +300,9 @@ func main() {
 		fmt.Println("      --no-icons             - Disable emoji icons")
 		fmt.Println("      --minimal              - Minimal output (no colors, icons, or extra info)")
 		fmt.Println("  stats [--no-color]      - Show progress statistics and task breakdown")
+		fmt.Println("  tags                     - List all available tags")
+		fmt.Println("  tag <index> <tag>        - Add a tag to an existing task")
+		fmt.Println("  untag <index> <tag>      - Remove a tag from a task")
 		fmt.Println("  done <index>             - Mark a task as done")
 		fmt.Println("  remove <index>           - Remove a task")
 		fmt.Println("  undodone <index>         - Mark a completed task as not done")
@@ -274,12 +313,17 @@ func main() {
 		fmt.Println("  findbydesc <desc>        - Find tasks by description")
 		fmt.Println("")
 		fmt.Println("Examples:")
-		fmt.Println("  taskmgr add \"Fix bug\" --priority=high --due=2024-01-15")
-		fmt.Println("  taskmgr add \"Review PR\" --priority=medium --due=tomorrow")
+		fmt.Println("  taskmgr add \"Fix bug\" --priority=high --due=2024-01-15 --tags=work,urgent")
+		fmt.Println("  taskmgr add \"Review PR\" --priority=medium --due=tomorrow --tags=work,code-review")
+		fmt.Println("  taskmgr add \"Buy groceries\" --tags=personal,shopping")
 		fmt.Println("  taskmgr list --priority=high --table")
+		fmt.Println("  taskmgr list --tag=work")
 		fmt.Println("  taskmgr list --overdue --no-color")
 		fmt.Println("  taskmgr list --due-today")
 		fmt.Println("  taskmgr list --due-within=7days --minimal")
+		fmt.Println("  taskmgr tags")
+		fmt.Println("  taskmgr tag 0 urgent")
+		fmt.Println("  taskmgr untag 0 urgent")
 		fmt.Println("  taskmgr stats")
 		os.Exit(1)
 	}
