@@ -1,3 +1,8 @@
+## v0.3.0 - 2025-01-27
+
+### ✨ Features
+* feat: implement task categories/tags system (#41) - https://github.com/qododavid/taskmgr/pull/41
+
 ## v0.2.0 - 2025-06-13
 
 ### ✨ Features
