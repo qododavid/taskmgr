@@ -1,4 +1,4 @@
-## v0.3.0 - 2025-06-14
+## v0.3.0 - 2025-06-13
 
 ### ✨ Features
 * feat: Add colorized output & better formatting (#39) - https://github.com/qododavid/taskmgr/pull/39
