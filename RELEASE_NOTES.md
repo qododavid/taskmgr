@@ -1,3 +1,8 @@
+## v0.2.0 - 2025-06-13
+
+### ✨ Features
+* feat: Add task priorities and due dates (#36) - https://github.com/qododavid/taskmgr/pull/36
+
 ## v0.1.0 - 2025-06-12
 
 ### ✨ Features
